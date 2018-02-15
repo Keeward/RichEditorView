@@ -414,25 +414,25 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
         // Handle pre-defined editor actions
         let callbackPrefix = "re-callback://"
         if navigationAction.request.url?.absoluteString.hasPrefix(callbackPrefix) == true {
-            
             // When we get a callback, we need to fetch the command queue to run the commands
             // It comes in as a JSON array of commands that we need to parse
-            let commands = runJS("RE.getCommandQueue();")
-
-            if let data = commands.data(using: .utf8) {
-                
-                let jsonCommands: [String]
-                do {
-                    jsonCommands = try JSONSerialization.jsonObject(with: data) as? [String] ?? []
-                } catch {
-                    jsonCommands = []
-                    NSLog("RichEditorView: Failed to parse JSON Commands")
+            runJS("RE.getCommandQueue();", completion: { (commands) in
+                if let data = commands.data(using: .utf8) {
+                    
+                    let jsonCommands: [String]
+                    do {
+                        jsonCommands = try JSONSerialization.jsonObject(with: data) as? [String] ?? []
+                    } catch {
+                        jsonCommands = []
+                        NSLog("RichEditorView: Failed to parse JSON Commands")
+                    }
+                    
+                    jsonCommands.forEach(self.performCommand)
                 }
-
-                jsonCommands.forEach(performCommand)
-            }
-
-            decisionHandler(.cancel)
+                
+                decisionHandler(.cancel)
+            })
+            
             return
         }
         
