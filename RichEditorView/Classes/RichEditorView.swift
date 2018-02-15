@@ -341,6 +341,29 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
     public func blur() {
         runJS("RE.blurFocus()")
     }
+    
+    /// Runs some JavaScript on the WKWebView and returns the result asyncronisely
+    /// If there is no result, returns an empty string
+    /// - parameter js: The JavaScript string to be run
+    /// - completion: The result of the JavaScript that was run
+    public func runJS(_ js: String, completion: ((String) -> Void)?) {
+        webView.evaluateJavaScript(js, completionHandler: {
+            (_ result: Any?, _ error: Error?) -> Void in
+            var resultString: String = ""
+            defer {
+                completion?(resultString)
+            }
+            
+            guard error == nil else {
+                print("evaluateJavaScript error (async) : \(error?.localizedDescription ?? "")")
+                return
+            }
+            
+            if let result = result {
+                resultString = "\(result)"
+            }
+        })
+    }
 
     /// Runs some JavaScript on the UIWebView and returns the result
     /// If there is no result, returns an empty string
