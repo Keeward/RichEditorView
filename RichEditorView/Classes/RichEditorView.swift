@@ -63,9 +63,13 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
     }
 
     /// Whether or not to allow user input in the view.
-    open var isEditingEnabled: Bool {
-        get { return isContentEditable }
-        set { isContentEditable = newValue }
+    
+    open func isEditingEnabled(completion: @escaping (Bool) -> Void) {
+        isContentEditable(completion: completion)
+    }
+    
+    open func set(isEditingEnabled: Bool) {
+        set(isContentEditable: isEditingEnabled, completion: nil)
     }
 
     /// The content HTML of the text being displayed.
@@ -88,17 +92,20 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
     private var innerLineHeight: Int = 28
 
     /// The line height of the editor. Defaults to 28.
-    open private(set) var lineHeight: Int {
-        get {
-            if isEditorLoaded, let lineHeight = Int(runJS("RE.getLineHeight();")) {
-                return lineHeight
+    func lineHeight(completion: @escaping (Int) -> Void) {
+        runJS("RE.getLineHeight();") { (jsResult) in
+            if self.isEditorLoaded, let lineHeight = Int(jsResult) {
+                completion(lineHeight)
             } else {
-                return innerLineHeight
+                completion(self.innerLineHeight)
             }
         }
-        set {
-            innerLineHeight = newValue
-            runJS("RE.setLineHeight('\(innerLineHeight)px');")
+    }
+    
+    func set(lineHeight: Int, completion: (() -> Void)?) {
+        self.innerLineHeight = lineHeight
+        runJS("RE.setLineHeight('\(lineHeight)px');") { _ in
+            completion?()
         }
     }
 
@@ -116,9 +123,10 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
 
     /// The inner height of the editor div.
     /// Fetches it from JS every time, so might be slow!
-    private var clientHeight: Int {
-        let heightString = runJS("document.getElementById('editor').clientHeight;")
-        return Int(heightString) ?? 0
+    private func clientHeight(completion: @escaping (Int) -> Void) {
+        runJS("document.getElementById('editor').clientHeight;") { (jsResult) in
+            completion(Int(jsResult) ?? 0)
+        }
     }
 
     // MARK: Initialization
@@ -175,171 +183,191 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
 
     /// The HTML that is currently loaded in the editor view, if it is loaded. If it has not been loaded yet, it is the
     /// HTML that will be loaded into the editor view once it finishes initializing.
-    public var html: String {
-        get {
-            return runJS("RE.getHtml();")
+    public func html(completion: @escaping (String) -> Void) {
+        runJS("RE.getHtml();") { (jsResult) in
+            completion(jsResult)
         }
-        set {
-            contentHTML = newValue
-            if isEditorLoaded {
-                runJS("RE.setHtml('\(newValue.escaped)');")
-                updateHeight()
+    }
+    
+    public func set(html: String, completion: (() -> Void)?) {
+        self.contentHTML = html
+        if isEditorLoaded {
+            runJS("RE.setHtml('\(html.escaped)');") { (jsResult) in
+                self.updateHeight()
+                completion?() 
             }
+        } else {
+            completion?()
         }
     }
 
     /// Text representation of the data that has been input into the editor view, if it has been loaded.
-    public var text: String {
-        return runJS("RE.getText()")
+    public func text(completion: @escaping (String) -> Void) {
+        runJS("RE.getText();") { (jsResult) in
+            completion(jsResult)
+        }
     }
 
     /// Private variable that holds the placeholder text, so you can set the placeholder before the editor loads.
     private var placeholderText: String = ""
     /// The placeholder text that should be shown when there is no user input.
     open var placeholder: String {
-        get { return placeholderText }
-        set {
-            placeholderText = newValue
-            runJS("RE.setPlaceholderText('\(newValue.escaped)');")
+        return placeholderText
+    }
+    
+    open func set(placeholder: String, completion: (() -> Void)?) {
+        self.placeholderText = placeholder
+        runJS("RE.setPlaceholderText('\(placeholder.escaped)');") { (jsResult) in
+            completion?()
         }
     }
 
 
     /// The href of the current selection, if the current selection's parent is an anchor tag.
     /// Will be nil if there is no href, or it is an empty string.
-    public var selectedHref: String? {
-        if !hasRangeSelection { return nil }
-        let href = runJS("RE.getSelectedHref();")
-        if href == "" {
-            return nil
-        } else {
-            return href
+    public func selectedHref(completion: @escaping (String?) -> Void) {
+        hasRangeSelection { (has) in
+            guard has else {
+                completion(nil)
+                return
+            }
+            self.runJS("RE.getSelectedHref();", completion: { (jsResult) in
+                completion(jsResult == "" ? nil : jsResult)
+            })
         }
     }
 
     /// Whether or not the selection has a type specifically of "Range".
-    public var hasRangeSelection: Bool {
-        return runJS("RE.rangeSelectionExists();") == "true" ? true : false
+    public func hasRangeSelection(completion: @escaping (Bool) -> Void) {
+        runJS("RE.rangeSelectionExists();") { (jsResult) in
+            completion(jsResult == "true" ? true : false)
+        }
     }
 
     /// Whether or not the selection has a type specifically of "Range" or "Caret".
-    public var hasRangeOrCaretSelection: Bool {
-        return runJS("RE.rangeOrCaretSelectionExists();") == "true" ? true : false
+    public func hasRangeOrCaretSelection(completion: @escaping (Bool) -> Void) {
+        runJS("RE.rangeOrCaretSelectionExists();") { (jsResult) in
+            completion(jsResult == "true" ? true : false)
+        }
     }
 
     // MARK: Methods
 
     public func removeFormat() {
-        runJS("RE.removeFormat();")
+        runJS("RE.removeFormat();", completion: nil)
     }
     
     public func setFontSize(_ size: Int) {
-        runJS("RE.setFontSize('\(size)px');")
+        runJS("RE.setFontSize('\(size)px');", completion: nil)
     }
     
     public func setEditorBackgroundColor(_ color: UIColor) {
-        runJS("RE.setBackgroundColor('\(color.hex)');")
+        runJS("RE.setBackgroundColor('\(color.hex)');", completion: nil)
     }
     
     public func undo() {
-        runJS("RE.undo();")
+        runJS("RE.undo();", completion: nil)
     }
     
     public func redo() {
-        runJS("RE.redo();")
+        runJS("RE.redo();", completion: nil)
     }
     
     public func bold() {
-        runJS("RE.setBold();")
+        runJS("RE.setBold();", completion: nil)
     }
     
     public func italic() {
-        runJS("RE.setItalic();")
+        runJS("RE.setItalic();", completion: nil)
     }
     
     // "superscript" is a keyword
     public func subscriptText() {
-        runJS("RE.setSubscript();")
+        runJS("RE.setSubscript();", completion: nil)
     }
     
     public func superscript() {
-        runJS("RE.setSuperscript();")
+        runJS("RE.setSuperscript();", completion: nil)
     }
     
     public func strikethrough() {
-        runJS("RE.setStrikeThrough();")
+        runJS("RE.setStrikeThrough();", completion: nil)
     }
     
     public func underline() {
-        runJS("RE.setUnderline();")
+        runJS("RE.setUnderline();", completion: nil)
     }
     
     public func setTextColor(_ color: UIColor) {
-        runJS("RE.prepareInsert();")
-        runJS("RE.setTextColor('\(color.hex)');")
+        runJS("RE.prepareInsert();") { _ in
+            self.runJS("RE.setTextColor('\(color.hex)');", completion: nil)
+        }
     }
     
     public func setTextBackgroundColor(_ color: UIColor) {
-        runJS("RE.prepareInsert();")
-        runJS("RE.setTextBackgroundColor('\(color.hex)');")
+        runJS("RE.prepareInsert();") { _ in
+            self.runJS("RE.setTextBackgroundColor('\(color.hex)');", completion: nil)
+        }
     }
     
     public func header(_ h: Int) {
-        runJS("RE.setHeading('\(h)');")
+        runJS("RE.setHeading('\(h)');", completion: nil)
     }
 
     public func indent() {
-        runJS("RE.setIndent();")
+        runJS("RE.setIndent();", completion: nil)
     }
 
     public func outdent() {
-        runJS("RE.setOutdent();")
+        runJS("RE.setOutdent();", completion: nil)
     }
 
     public func orderedList() {
-        runJS("RE.setOrderedList();")
+        runJS("RE.setOrderedList();", completion: nil)
     }
 
     public func unorderedList() {
-        runJS("RE.setUnorderedList();")
+        runJS("RE.setUnorderedList();", completion: nil)
     }
 
     public func blockquote() {
-        runJS("RE.setBlockquote()");
+        runJS("RE.setBlockquote()", completion: nil);
     }
     
     public func alignLeft() {
-        runJS("RE.setJustifyLeft();")
+        runJS("RE.setJustifyLeft();", completion: nil)
     }
     
     public func alignCenter() {
-        runJS("RE.setJustifyCenter();")
+        runJS("RE.setJustifyCenter();", completion: nil)
     }
     
     public func alignRight() {
-        runJS("RE.setJustifyRight();")
+        runJS("RE.setJustifyRight();", completion: nil)
     }
     
     public func insertImage(_ url: String, alt: String) {
-        runJS("RE.prepareInsert();")
-        runJS("RE.insertImage('\(url.escaped)', '\(alt.escaped)');")
+        runJS("RE.prepareInsert();") { _ in
+            self.runJS("RE.insertImage('\(url.escaped)', '\(alt.escaped)');", completion: nil)
+        }
     }
     
     public func insertLink(_ href: String, title: String) {
-        runJS("RE.prepareInsert();")
-        runJS("RE.insertLink('\(href.escaped)', '\(title.escaped)');")
+        runJS("RE.prepareInsert();") { _ in
+            self.runJS("RE.insertLink('\(href.escaped)', '\(title.escaped)');", completion: nil)
+        }
     }
     
     public func focus() {
-        runJS("RE.focus();")
+        runJS("RE.focus();", completion: nil)
     }
 
     public func focus(at: CGPoint) {
-        runJS("RE.focusAtPoint(\(at.x), \(at.y));")
+        runJS("RE.focusAtPoint(\(at.x), \(at.y));", completion: nil)
     }
     
     public func blur() {
-        runJS("RE.blurFocus()")
+        runJS("RE.blurFocus()", completion: nil)
     }
     
     /// Runs some JavaScript on the WKWebView and returns the result asyncronisely
@@ -363,36 +391,6 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
                 resultString = "\(result)"
             }
         })
-    }
-
-    /// Runs some JavaScript on the UIWebView and returns the result
-    /// If there is no result, returns an empty string
-    /// - parameter js: The JavaScript string to be run
-    /// - returns: The result of the JavaScript that was run
-    @discardableResult
-    public func runJS(_ js: String) -> String {
-        let string = stringByEvaluatingJavaScript(from: js) ?? ""
-        return string
-    }
-    
-    private func stringByEvaluatingJavaScript(from script: String) -> String? {
-        var resultString: String? = nil
-        var finished = false
-        webView.evaluateJavaScript(script, completionHandler: {(_ result: Any?, _ error: Error?) -> Void in
-            if error == nil {
-                if result != nil {
-                    resultString = "\(result)"
-                }
-            }
-            else {
-                print("evaluateJavaScript error : \(error?.localizedDescription)")
-            }
-            finished = true
-        })
-        while !finished {
-            RunLoop.current.run(mode: .defaultRunLoopMode, before: Date.distantFuture)
-        }
-        return resultString
     }
 
 
@@ -461,94 +459,154 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
 
 
     // MARK: - Private Implementation Details
-
-    private var isContentEditable: Bool {
-        get {
-            if isEditorLoaded {
-                let value = runJS("RE.editor.isContentEditable")
-                editingEnabledVar = Bool(value) ?? false
-                return editingEnabledVar
-            }
-            return editingEnabledVar
+    
+    private func isContentEditable(completion: @escaping (Bool) -> Void) {
+        if isEditorLoaded {
+            runJS("RE.editor.isContentEditable", completion: { (jsResult) in
+                self.editingEnabledVar = Bool(jsResult) ?? false
+                completion(self.editingEnabledVar)
+            })
+            return
         }
-        set {
-            editingEnabledVar = newValue
-            if isEditorLoaded {
-                let value = newValue ? "true" : "false"
-                runJS("RE.editor.contentEditable = \(value);")
+        completion(editingEnabledVar)
+    }
+    
+    private func set(isContentEditable: Bool, completion: (() -> Void)?) {
+        self.editingEnabledVar = isContentEditable
+        if isEditorLoaded {
+            let value = isContentEditable ? "true" : "false"
+            runJS("RE.editor.contentEditable = \(value);") { _ in
+                completion?()
             }
+            return
         }
+        completion?()
     }
     
     /// The position of the caret relative to the currently shown content.
     /// For example, if the cursor is directly at the top of what is visible, it will return 0.
     /// This also means that it will be negative if it is above what is currently visible.
     /// Can also return 0 if some sort of error occurs between JS and here.
-    private var relativeCaretYPosition: Int {
-        let string = runJS("RE.getRelativeCaretYPosition();")
-        return Int(string) ?? 0
+    private func relativeCaretYPosition(completion: @escaping (Int) -> Void) {
+        runJS("RE.getRelativeCaretYPosition();") { (jsResult) in
+            completion(Int(jsResult) ?? 0)
+        }
     }
 
     private func updateHeight() {
-        let heightString = runJS("document.getElementById('editor').clientHeight;")
-        let height = Int(heightString) ?? 0
-        if editorHeight != height {
-            editorHeight = height
+        runJS("document.getElementById('editor').clientHeight;") { (heightString) in
+            let height = Int(heightString) ?? 0
+            if self.editorHeight != height {
+                self.editorHeight = height
+            }
         }
     }
 
     /// Scrolls the editor to a position where the caret is visible.
     /// Called repeatedly to make sure the caret is always visible when inputting text.
     /// Works only if the `lineHeight` of the editor is available.
-    private func scrollCaretToVisible() {
-        let scrollView = self.webView.scrollView
+    private func scrollCaretToVisible(completion: (() -> Void)?) {
+        var clientHeight: Int = 0
+        var lineHeight: Int = 0
+        var relativeCaretYPosition: Int = 0
         
-        let contentHeight = clientHeight > 0 ? CGFloat(clientHeight) : scrollView.frame.height
-        scrollView.contentSize = CGSize(width: scrollView.frame.width, height: contentHeight)
-        
-        // XXX: Maybe find a better way to get the cursor height
-        let lineHeight = CGFloat(self.lineHeight)
-        let cursorHeight = lineHeight - 4
-        let visiblePosition = CGFloat(relativeCaretYPosition)
-        var offset: CGPoint?
-
-        if visiblePosition + cursorHeight > scrollView.bounds.size.height {
-            // Visible caret position goes further than our bounds
-            offset = CGPoint(x: 0, y: (visiblePosition + lineHeight) - scrollView.bounds.height + scrollView.contentOffset.y)
-
-        } else if visiblePosition < 0 {
-            // Visible caret position is above what is currently visible
-            var amount = scrollView.contentOffset.y + visiblePosition
-            amount = amount < 0 ? 0 : amount
-            offset = CGPoint(x: scrollView.contentOffset.x, y: amount)
-
+        let group = DispatchGroup()
+        group.enter()
+        self.clientHeight { (height) in
+            clientHeight = height
+            group.leave()
         }
-
-        if let offset = offset {
-            scrollView.setContentOffset(offset, animated: true)
+        group.enter()
+        self.lineHeight { (height) in
+            lineHeight = height
+            group.leave()
+        }
+        group.enter()
+        self.relativeCaretYPosition { (yPosition) in
+            relativeCaretYPosition = yPosition
+            group.leave()
+        }
+        
+        group.notify(queue: DispatchQueue.main) {
+            defer {
+                completion?()
+            }
+            
+            let scrollView = self.webView.scrollView
+            
+            let contentHeight = clientHeight > 0 ? CGFloat(clientHeight) : scrollView.frame.height
+            scrollView.contentSize = CGSize(width: scrollView.frame.width, height: contentHeight)
+            
+            // XXX: Maybe find a better way to get the cursor height
+            let lineHeight = CGFloat(lineHeight)
+            let cursorHeight = lineHeight - 4
+            let visiblePosition = CGFloat(relativeCaretYPosition)
+            var offset: CGPoint?
+            
+            if visiblePosition + cursorHeight > scrollView.bounds.size.height {
+                // Visible caret position goes further than our bounds
+                offset = CGPoint(x: 0, y: (visiblePosition + lineHeight) - scrollView.bounds.height + scrollView.contentOffset.y)
+                
+            } else if visiblePosition < 0 {
+                // Visible caret position is above what is currently visible
+                var amount = scrollView.contentOffset.y + visiblePosition
+                amount = amount < 0 ? 0 : amount
+                offset = CGPoint(x: scrollView.contentOffset.x, y: amount)
+                
+            }
+            
+            if let offset = offset {
+                scrollView.setContentOffset(offset, animated: true)
+            }
         }
     }
     
     /// Called when actions are received from JavaScript
     /// - parameter method: String with the name of the method and optional parameters that were passed in
     private func performCommand(_ method: String) {
+        let group = DispatchGroup()
+        
         if method.hasPrefix("ready") {
             // If loading for the first time, we have to set the content HTML to be displayed
             if !isEditorLoaded {
                 isEditorLoaded = true
-                html = contentHTML
-                isContentEditable = editingEnabledVar
-                placeholder = placeholderText
-                lineHeight = innerLineHeight
-                delegate?.richEditorDidLoad?(self)
+                group.enter()
+                self.set(html: contentHTML, completion: {
+                    group.leave()
+                })
+                group.enter()
+                self.set(isContentEditable: editingEnabledVar) {
+                    group.leave()
+                }
+                group.enter()
+                self.set(lineHeight: innerLineHeight) {
+                    group.leave()
+                }
+                group.enter()
+                self.set(placeholder: placeholderText) {
+                    group.leave()
+                }
+                group.notify(queue: DispatchQueue.main) {
+                    self.updateHeight()
+                    self.delegate?.richEditorDidLoad?(self)
+                }
+            } else {
+                updateHeight()
             }
-            updateHeight()
         }
         else if method.hasPrefix("input") {
-            scrollCaretToVisible()
-            let content = runJS("RE.getHtml()")
-            contentHTML = content
-            updateHeight()
+            group.enter()
+            scrollCaretToVisible(completion: {
+                group.leave()
+            })
+            group.enter()
+            self.html(completion: { (content) in
+                self.contentHTML = content
+                group.leave()
+            })
+            group.notify(queue: DispatchQueue.main) {
+                self.updateHeight()
+            }
         }
         else if method.hasPrefix("updateHeight") {
             updateHeight()
@@ -560,15 +618,20 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
             delegate?.richEditorLostFocus?(self)
         }
         else if method.hasPrefix("action/") {
-            let content = runJS("RE.getHtml()")
-            contentHTML = content
+            group.enter()
+            runJS("RE.getHtml()") { (content) in
+                self.contentHTML = content
+                group.leave()
+            }
             
-            // If there are any custom actions being called
-            // We need to tell the delegate about it
-            let actionPrefix = "action/"
-            let range = method.range(of: actionPrefix)!
-            let action = method.replacingCharacters(in: range, with: "")
-            delegate?.richEditor?(self, handle: action)
+            group.notify(queue: DispatchQueue.main) {
+                // If there are any custom actions being called
+                // We need to tell the delegate about it
+                let actionPrefix = "action/"
+                let range = method.range(of: actionPrefix)!
+                let action = method.replacingCharacters(in: range, with: "")
+                self.delegate?.richEditor?(self, handle: action)
+            }
         }
     }
 
