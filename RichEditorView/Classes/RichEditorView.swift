@@ -91,6 +91,8 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
     /// The value we hold in order to be able to set the line height before the JS completely loads.
     private var innerLineHeight: Int = 28
 
+    private var scrollCaretNotified: Bool = false
+
     /// The line height of the editor. Defaults to 28.
     func lineHeight(completion: @escaping (Int) -> Void) {
         runJS("RE.getLineHeight();") { (jsResult) in
@@ -506,6 +508,12 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
     /// Called repeatedly to make sure the caret is always visible when inputting text.
     /// Works only if the `lineHeight` of the editor is available.
     private func scrollCaretToVisible(completion: (() -> Void)?) {
+        guard !self.scrollCaretNotified else {
+          return
+        }
+
+        self.scrollCaretNotified = true
+
         var clientHeight: Int = 0
         var lineHeight: Int = 0
         var relativeCaretYPosition: Int = 0
@@ -529,6 +537,7 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
         
         group.notify(queue: DispatchQueue.main) {
             defer {
+                self.scrollCaretNotified = false
                 completion?()
             }
             
