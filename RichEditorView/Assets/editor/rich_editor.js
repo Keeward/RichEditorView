@@ -329,6 +329,10 @@ RE.blurFocus = function() {
     RE.editor.blur();
 };
 
+RE.getClientHeight = function() {
+  return document.getElementById('editor').clientHeight;
+}
+
 /**
 Recursively search element ancestors to find a element nodeName e.g. A
 **/
