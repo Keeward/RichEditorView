@@ -126,7 +126,7 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
     /// The inner height of the editor div.
     /// Fetches it from JS every time, so might be slow!
     private func clientHeight(completion: @escaping (Int) -> Void) {
-        runJS("document.getElementById('editor').clientHeight;") { (jsResult) in
+        runJS("RE.getClientHeight();") { (jsResult) in
             completion(Int(jsResult) ?? 0)
         }
     }
@@ -496,7 +496,7 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
     }
 
     private func updateHeight() {
-        runJS("document.getElementById('editor').clientHeight;") { (heightString) in
+        runJS("RE.getClientHeight();") { (heightString) in
             let height = Int(heightString) ?? 0
             if self.editorHeight != height {
                 self.editorHeight = height
