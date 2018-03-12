@@ -179,6 +179,11 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
         addGestureRecognizer(tapRecognizer)
     }
 
+    open override func layoutSubviews() {
+      webView.frame = bounds
+      super.layoutSubviews()
+    }
+
     // MARK: - Rich Text Editing
 
     // MARK: Properties
