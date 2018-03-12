@@ -163,6 +163,10 @@ open class RichEditorView: UIView, UIScrollViewDelegate, WKNavigationDelegate, U
         webView.scrollView.bounces = false
         webView.scrollView.delegate = self
         webView.scrollView.clipsToBounds = false
+
+        if #available(iOS 11.0, *) {
+          webView.scrollView.contentInsetAdjustmentBehavior = .never
+        }
         
         webView.cjw_inputAccessoryView = nil
         
